@@ -15,15 +15,53 @@ class LoginPhoneScreen extends StatefulWidget {
 
 class _LoginPhoneScreenState extends State<LoginPhoneScreen> {
   final _phoneController = TextEditingController();
+  final _focusNode = FocusNode();
+  bool _hasLostFocus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    if (!_focusNode.hasFocus) {
+      setState(() {
+        _hasLostFocus = true;
+      });
+    }
+  }
 
   @override
   void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
     _phoneController.dispose();
     super.dispose();
   }
 
+  String _cleanPhone(String input) {
+    var cleaned = input.replaceAll(RegExp(r'[\s\-]'), '');
+    if (cleaned.startsWith('+95')) {
+      cleaned = cleaned.substring(3);
+    }
+    if (cleaned.startsWith('0')) {
+      cleaned = cleaned.substring(1);
+    }
+    return cleaned;
+  }
+
+  bool _validatePhone(String input) {
+    final cleaned = _cleanPhone(input);
+    return RegExp(r'^9\d{7,9}$').hasMatch(cleaned);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final rawPhone = _phoneController.text;
+    final isValid = _validatePhone(rawPhone);
+    final cleanedPhone = _cleanPhone(rawPhone);
+
     return Scaffold(
       backgroundColor: const Color(0xFFFFF7F9),
       body: SafeArea(
@@ -47,8 +85,10 @@ class _LoginPhoneScreenState extends State<LoginPhoneScreen> {
 
               TextField(
                 controller: _phoneController,
+                focusNode: _focusNode,
                 keyboardType: TextInputType.phone,
-                style: TextStyle(
+                onChanged: (_) => setState(() {}),
+                style: const TextStyle(
                   fontSize: 18,
                   fontFamily: AppTypo.generalSans,
                   height: 1,
@@ -77,6 +117,9 @@ class _LoginPhoneScreenState extends State<LoginPhoneScreen> {
                     borderSide: BorderSide.none,
                     borderRadius: BorderRadius.circular(8),
                   ),
+                  errorText: (_hasLostFocus && !isValid)
+                      ? 'Please enter a valid phone number (e.g. 09254135592)'
+                      : null,
                 ),
               ),
 
@@ -85,18 +128,22 @@ class _LoginPhoneScreenState extends State<LoginPhoneScreen> {
               SizedBox(
                 width: double.infinity,
                 child: TextButton(
-                  onPressed: () {
-                    context.push(
-                      Routes.loginCode,
-                      extra: OtpCodeArgs(
-                        phone: _phoneController.text,
-                        expireIn: 300,
-                      ),
-                    );
-                  },
+                  onPressed: isValid
+                      ? () {
+                          context.push(
+                            Routes.loginCode,
+                            extra: OtpCodeArgs(
+                              phone: '+95$cleanedPhone',
+                              expireIn: 300,
+                            ),
+                          );
+                        }
+                      : null,
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.all(16),
-                    backgroundColor: const Color(0xFF4AC3E2),
+                    backgroundColor: isValid
+                        ? const Color(0xFF4AC3E2)
+                        : const Color(0xFF4AC3E2).withOpacity(0.4),
                     foregroundColor: Colors.white,
                   ),
                   child: Text(

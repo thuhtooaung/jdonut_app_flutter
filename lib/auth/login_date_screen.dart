@@ -10,6 +10,8 @@ import 'package:jdonut_app_flutter/widgets/accept_aggrement_widget.dart';
 class LoginDateScreen extends StatefulWidget {
   const LoginDateScreen({super.key});
 
+  static const int minAge = 13;
+
   @override
   State<LoginDateScreen> createState() => _LoginDateScreenState();
 }
@@ -18,6 +20,8 @@ class _LoginDateScreenState extends State<LoginDateScreen> {
   final _dayController = TextEditingController();
   final _yearController = TextEditingController();
   final _monthController = TextEditingController();
+
+  String? _dateError;
 
   static const List<String> _monthNames = [
     'January',
@@ -36,10 +40,11 @@ class _LoginDateScreenState extends State<LoginDateScreen> {
 
   @override
   void initState() {
-    final date = DateTime.now();
-    _dayController.text = date.day.toString();
-    _yearController.text = date.year.toString();
-    _monthController.text = FormatUtils.formatMonthName(date);
+    final now = DateTime.now();
+    final defaultDate = DateTime(now.year - LoginDateScreen.minAge, now.month, now.day);
+    _dayController.text = defaultDate.day.toString();
+    _yearController.text = defaultDate.year.toString();
+    _monthController.text = FormatUtils.formatMonthName(defaultDate);
     super.initState();
   }
 
@@ -51,8 +56,27 @@ class _LoginDateScreenState extends State<LoginDateScreen> {
     super.dispose();
   }
 
+  bool _isLeapYear(int year) {
+    return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+  }
+
   int _getDaysInMonth(int year, int month) {
-    return DateTime(year, month + 1, 0).day;
+    if (month < 1 || month > 12) return 0;
+    final List<int> days = [
+      31,
+      _isLeapYear(year) ? 29 : 28,
+      31,
+      30,
+      31,
+      30,
+      31,
+      31,
+      30,
+      31,
+      30,
+      31,
+    ];
+    return days[month - 1];
   }
 
   int _getMonthIndex(String monthName) {
@@ -69,6 +93,41 @@ class _LoginDateScreenState extends State<LoginDateScreen> {
     if (currentDay > maxDays) {
       _dayController.text = maxDays.toString();
     }
+  }
+
+  String? _validateDate() {
+    final year = int.tryParse(_yearController.text);
+    final month = _getMonthIndex(_monthController.text);
+    final day = int.tryParse(_dayController.text);
+
+    if (year == null || day == null) {
+      return 'Please select a valid date';
+    }
+
+    final maxDays = _getDaysInMonth(year, month);
+    if (day < 1 || day > maxDays) {
+      return 'Invalid calendar date';
+    }
+
+    final selectedDate = DateTime(year, month, day);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (selectedDate.isAfter(today)) {
+      return 'Date cannot be in the future';
+    }
+
+    int age = today.year - selectedDate.year;
+    if (today.month < selectedDate.month ||
+        (today.month == selectedDate.month && today.day < selectedDate.day)) {
+      age--;
+    }
+
+    if (age < LoginDateScreen.minAge) {
+      return 'You must be at least ${LoginDateScreen.minAge} years old';
+    }
+
+    return null;
   }
 
   void _showMonthPicker() {
@@ -93,6 +152,7 @@ class _LoginDateScreenState extends State<LoginDateScreen> {
                   setState(() {
                     _monthController.text = _monthNames[selectedIndex];
                     _validateAndAdjustDay();
+                    _dateError = _validateDate();
                   });
                   Navigator.pop(context);
                 },
@@ -153,6 +213,7 @@ class _LoginDateScreenState extends State<LoginDateScreen> {
                 onDone: () {
                   setState(() {
                     _dayController.text = days[selectedIndex].toString();
+                    _dateError = _validateDate();
                   });
                   Navigator.pop(context);
                 },
@@ -219,6 +280,7 @@ class _LoginDateScreenState extends State<LoginDateScreen> {
                   setState(() {
                     _yearController.text = years[selectedIndex].toString();
                     _validateAndAdjustDay();
+                    _dateError = _validateDate();
                   });
                   Navigator.pop(context);
                 },
@@ -317,7 +379,7 @@ class _LoginDateScreenState extends State<LoginDateScreen> {
               AuthTopBarWidget(progress: 1),
               const SizedBox(height: 32),
               const Text(
-                "What's your\nname?",
+                "When's your\nbirthday?",
                 style: TextStyle(
                   fontSize: 36,
                   fontFamily: AppTypo.menco,
@@ -381,13 +443,32 @@ class _LoginDateScreenState extends State<LoginDateScreen> {
                 onTap: _showYearPicker,
               ),
 
+              if (_dateError != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _dateError!,
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontSize: 12,
+                    fontFamily: AppTypo.generalSans,
+                  ),
+                ),
+              ],
+
               const Spacer(),
 
               SizedBox(
                 width: double.infinity,
                 child: TextButton(
                   onPressed: () {
-                    context.go(Routes.main);
+                    final error = _validateDate();
+                    if (error == null) {
+                      context.go(Routes.main);
+                    } else {
+                      setState(() {
+                        _dateError = error;
+                      });
+                    }
                   },
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.all(16),

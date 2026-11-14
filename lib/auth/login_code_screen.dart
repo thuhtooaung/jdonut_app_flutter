@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,8 +20,14 @@ class LoginCodeScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginCodeScreen> createState() => _LoginCodeScreenState();
 }
 
-class _LoginCodeScreenState extends ConsumerState<LoginCodeScreen> {
+class _LoginCodeScreenState extends ConsumerState<LoginCodeScreen>
+    with SingleTickerProviderStateMixin {
   final _pinController = TextEditingController();
+  late AnimationController _shakeController;
+
+  int _failedAttempts = 0;
+  bool _isLocked = false;
+  String? _errorMessage;
 
   final _defaultPinTheme = PinTheme(
     width: 56,
@@ -31,19 +39,56 @@ class _LoginCodeScreenState extends ConsumerState<LoginCodeScreen> {
     ),
   );
 
+  @override
+  void initState() {
+    super.initState();
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+  }
+
   void _onPressedVerify() {
+    if (_isLocked) return;
+
     final pin = _pinController.text.trim();
-    if (pin.isNotEmpty) {
+    if (pin.length != 6) return;
+
+    if (pin == '123456') {
+      setState(() {
+        _errorMessage = null;
+      });
       context.push(Routes.loginName);
+    } else {
+      _failedAttempts++;
+      _shakeController.forward(from: 0.0);
+      _pinController.clear();
+
+      setState(() {
+        if (_failedAttempts >= 3) {
+          _isLocked = true;
+          _errorMessage =
+              '3 wrong codes. Entry is locked until you tap Resend.';
+        } else {
+          _errorMessage = 'Invalid verification code. Please try again.';
+        }
+      });
     }
   }
 
   void _onResend() {
+    setState(() {
+      _failedAttempts = 0;
+      _isLocked = false;
+      _errorMessage = null;
+      _pinController.clear();
+    });
     ref.read(loginCodeViewModelProvider(widget.args).notifier).resendCode();
   }
 
   @override
   void dispose() {
+    _shakeController.dispose();
     _pinController.dispose();
     super.dispose();
   }
@@ -75,20 +120,43 @@ class _LoginCodeScreenState extends ConsumerState<LoginCodeScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                "We've sent 6 digit OTP to PHONE-NUMBER",
-                style: TextStyle(fontSize: 12, fontFamily: AppTypo.generalSans),
+              Text(
+                "We've sent 6 digit OTP to ${widget.args.phone}",
+                style: const TextStyle(fontSize: 12, fontFamily: AppTypo.generalSans),
               ),
               const SizedBox(height: 24),
-              Pinput(
-                length: 6,
-                defaultPinTheme: _defaultPinTheme,
-                controller: _pinController,
-                showCursor: false,
-                onCompleted: (value) {
-                  _onPressedVerify();
+              AnimatedBuilder(
+                animation: _shakeController,
+                builder: (context, child) {
+                  final double offset =
+                      sin(_shakeController.value * pi * 4) * 10;
+                  return Transform.translate(
+                    offset: Offset(offset, 0),
+                    child: child,
+                  );
                 },
+                child: Pinput(
+                  length: 6,
+                  enabled: !_isLocked,
+                  defaultPinTheme: _defaultPinTheme,
+                  controller: _pinController,
+                  showCursor: false,
+                  onCompleted: (value) {
+                    _onPressedVerify();
+                  },
+                ),
               ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _errorMessage!,
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontSize: 12,
+                    fontFamily: AppTypo.generalSans,
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -136,7 +204,7 @@ class _LoginCodeScreenState extends ConsumerState<LoginCodeScreen> {
                       ],
                     ),
                   ),
-                  if (resendStatus.canResend)
+                  if (resendStatus.canResend || _isLocked)
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: _onResend,
@@ -145,6 +213,7 @@ class _LoginCodeScreenState extends ConsumerState<LoginCodeScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
+                          color: Color(0xFFFF5288),
                         ),
                       ),
                     ),
