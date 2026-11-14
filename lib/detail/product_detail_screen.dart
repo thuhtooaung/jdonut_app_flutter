@@ -1,9 +1,13 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:jdonut_app_flutter/home/presentation/models/product_args.dart';
 import 'package:jdonut_app_flutter/theme/app_assets.dart';
 import 'package:jdonut_app_flutter/theme/app_typo.dart';
 
 class ProductDetailScreen extends StatefulWidget {
-  const ProductDetailScreen({super.key});
+  final ProductArgs? args;
+
+  const ProductDetailScreen({super.key, this.args});
 
   @override
   State<ProductDetailScreen> createState() => _ProductDetailScreenState();
@@ -26,6 +30,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final name = widget.args?.name ?? 'Coconut Donut';
+    final productCode = widget.args?.productCode ?? 'JD022123';
+    final badgeText = widget.args?.discountTag ?? 'New';
+    final price = widget.args?.price ?? '3,200 MMK';
+    final imageUrl = widget.args?.imageUrl;
+    final description = widget.args?.description ??
+        'Enjoy our scrumptious donuts – soft, sweet, and satisfying in every bite. Choose from classic glazed, rich chocolate, or fun sprinkles. Dive into deliciousness now!';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F8),
       appBar: AppBar(
@@ -50,7 +62,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         clipBehavior: Clip.none,
                         alignment: Alignment.center,
                         children: [
-                          // Main Card Container (with bottom margin to create room for the overlap)
+                          // Main Card Container
                           Container(
                             margin: const EdgeInsets.only(bottom: 28.0),
                             padding: const EdgeInsets.fromLTRB(
@@ -73,16 +85,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Header Row: Product Code & "New" Badge
+                                // Header Row: Product Code & Badge
                                 Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
-                                      'JD022123',
-                                      style: TextStyle(
+                                      productCode,
+                                      style: const TextStyle(
                                         fontFamily: AppTypo.generalSans,
-                                        color: const Color(0xFF9E9E9E),
+                                        color: Color(0xFF9E9E9E),
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -99,8 +111,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                         ),
                                       ),
                                       child: Text(
-                                        'New',
-                                        style: TextStyle(
+                                        badgeText,
+                                        style: const TextStyle(
                                           fontFamily: AppTypo.generalSans,
                                           color: Colors.white,
                                           fontSize: 12,
@@ -114,8 +126,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                                 // Product Title
                                 Text(
-                                  'Coconut Donut',
-                                  style: TextStyle(
+                                  name,
+                                  style: const TextStyle(
                                     fontFamily: AppTypo.generalSans,
                                     color: Colors.black87,
                                     fontSize: 24,
@@ -126,8 +138,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                                 // Price
                                 Text(
-                                  '3200 MMK',
-                                  style: TextStyle(
+                                  price,
+                                  style: const TextStyle(
                                     fontFamily: AppTypo.generalSans,
                                     color: Colors.black87,
                                     fontSize: 16,
@@ -136,14 +148,33 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 ),
                                 const SizedBox(height: 24),
 
-                                // Static Product Donut Image
+                                // Product Image
                                 Center(
                                   child: SizedBox(
                                     width: 220,
                                     height: 220,
-                                    child: Image.asset(
-                                      AppAssets.donut,
-                                      fit: BoxFit.contain,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: imageUrl != null && imageUrl.isNotEmpty
+                                          ? CachedNetworkImage(
+                                              imageUrl: imageUrl,
+                                              fit: BoxFit.cover,
+                                              placeholder: (context, url) =>
+                                                  const Center(
+                                                child: CircularProgressIndicator(
+                                                    strokeWidth: 2),
+                                              ),
+                                              errorWidget:
+                                                  (context, url, error) =>
+                                                      Image.asset(
+                                                AppAssets.donut,
+                                                fit: BoxFit.contain,
+                                              ),
+                                            )
+                                          : Image.asset(
+                                              AppAssets.donut,
+                                              fit: BoxFit.contain,
+                                            ),
                                     ),
                                   ),
                                 ),
@@ -151,7 +182,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                           ),
 
-                          // Quantity Stepper Selector overlapping the bottom edge
+                          // Quantity Stepper Selector
                           Positioned(
                             bottom: 0,
                             child: Container(
@@ -173,7 +204,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  // Decrement Button
                                   IconButton(
                                     onPressed: _decrement,
                                     icon: const Icon(Icons.remove),
@@ -189,7 +219,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     ),
                                     child: Text(
                                       '$_quantity',
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         fontFamily: AppTypo.generalSans,
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
@@ -197,7 +227,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       ),
                                     ),
                                   ),
-                                  // Increment Button
                                   IconButton(
                                     onPressed: _increment,
                                     icon: const Icon(Icons.add),
@@ -225,7 +254,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             size: 24,
                           ),
                           const SizedBox(width: 8),
-                          Text(
+                          const Text(
                             "What's\nthis?",
                             style: TextStyle(
                               fontFamily: AppTypo.generalSans,
@@ -238,7 +267,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           const SizedBox(width: 16),
                           Expanded(
                             child: Text(
-                              'Enjoy our scrumptious donuts – soft, sweet, and satisfying in every bite. Choose from classic glazed, rich chocolate, or fun sprinkles. Dive into deliciousness now!',
+                              description,
                               style: TextStyle(
                                 fontFamily: AppTypo.generalSans,
                                 color: Colors.grey.shade600,
@@ -261,9 +290,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: () {
-                      // Handle Add to Cart action
-                    },
+                    onPressed: () {},
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4DD0E1),
                       shape: RoundedRectangleBorder(
@@ -274,7 +301,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
+                        const Text(
                           'ADD TO CART',
                           style: TextStyle(
                             fontFamily: AppTypo.generalSans,
@@ -295,8 +322,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                         ),
                         Text(
-                          '3,200 MMK',
-                          style: TextStyle(
+                          price,
+                          style: const TextStyle(
                             fontFamily: AppTypo.generalSans,
                             color: Colors.white,
                             fontSize: 15,

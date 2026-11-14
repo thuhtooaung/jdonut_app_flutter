@@ -59,7 +59,7 @@ final class LoginCodeViewModelProvider
 }
 
 String _$loginCodeViewModelHash() =>
-    r'be98b994f31440683d983c21ee801fe9a8484922';
+    r'19f9cd63192f3322df102924ccf7222e157356a1';
 
 final class LoginCodeViewModelFamily extends $Family
     with
