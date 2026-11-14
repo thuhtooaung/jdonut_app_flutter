@@ -26,6 +26,16 @@ class PromoBannerModel {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'tag_text': tagText,
+      'background_color': backgroundColorHex,
+      'image_url': imageUrl,
+    };
+  }
+
   static Color _parseColor(String hexString) {
     final buffer = StringBuffer();
     final cleanHex = hexString.replaceFirst('#', '');
@@ -67,6 +77,15 @@ class SeasonalSpecialModel {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'image_url': imageUrl,
+      'discount_tag': discountTag,
+    };
+  }
+
   SeasonalSpecialEntity toEntity() {
     return SeasonalSpecialEntity(
       id: id,
@@ -99,6 +118,15 @@ class PopularItemModel {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'image_url': imageUrl,
+      'price': price,
+    };
+  }
+
   PopularItemEntity toEntity() {
     return PopularItemEntity(
       id: id,
@@ -129,6 +157,15 @@ class OrderAgainItemModel {
       imageUrl: json['image_url'] as String? ?? '',
       discountTag: json['discount_tag'] as String?,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'image_url': imageUrl,
+      'discount_tag': discountTag,
+    };
   }
 
   OrderAgainItemEntity toEntity() {
@@ -164,6 +201,16 @@ class NearbyShopModel {
       actionText: json['action_text'] as String? ?? 'Order Online',
       imageUrl: json['image_url'] as String? ?? '',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'address': address,
+      'action_text': actionText,
+      'image_url': imageUrl,
+    };
   }
 
   NearbyShopEntity toEntity() {
@@ -225,6 +272,16 @@ class HomeDataModel {
       orderAgainItems: orderAgainList,
       nearbyShops: nearbyShopsList,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'promo_banners': promoBanners.map((e) => e.toJson()).toList(),
+      'seasonal_specials': seasonalSpecials.map((e) => e.toJson()).toList(),
+      'popular_items': popularItems.map((e) => e.toJson()).toList(),
+      'order_again_items': orderAgainItems.map((e) => e.toJson()).toList(),
+      'nearby_shops': nearbyShops.map((e) => e.toJson()).toList(),
+    };
   }
 
   HomeDataEntity toEntity() {

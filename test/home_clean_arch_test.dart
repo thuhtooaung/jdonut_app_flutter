@@ -1,20 +1,56 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:jdonut_app_flutter/detail/product_detail_screen.dart';
-import 'package:jdonut_app_flutter/home/data/datasources/home_fake_data.dart';
+import 'package:jdonut_app_flutter/home/data/datasources/home_local_data_source.dart';
+import 'package:jdonut_app_flutter/home/data/datasources/home_remote_data_source.dart';
+import 'package:jdonut_app_flutter/home/data/models/home_data_model.dart';
 import 'package:jdonut_app_flutter/home/data/repositories/home_repository_impl.dart';
-import 'package:jdonut_app_flutter/home/domain/usecase/get_home_data_usecase.dart';
 import 'package:jdonut_app_flutter/home/presentation/models/product_args.dart';
 import 'package:jdonut_app_flutter/home/presentation/screens/home_screen.dart';
 import 'package:jdonut_app_flutter/routing/routes.dart';
 
+class MockRemoteDataSource implements HomeRemoteDataSource {
+  bool shouldThrow = false;
+  final HomeDataModel modelToReturn;
+
+  MockRemoteDataSource({required this.modelToReturn, this.shouldThrow = false});
+
+  @override
+  Future<HomeDataModel> getHomeData() async {
+    if (shouldThrow) {
+      throw Exception('Network error');
+    }
+    return modelToReturn;
+  }
+}
+
 void main() {
-  group('Home Clean Architecture Data & Domain Tests', () {
-    test('Local Data Source returns valid JSON response models with placeholder image',
-        () async {
-      final dataSource = HomeLocalDataSourceImpl();
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() async {
+    final tempDir = Directory.systemTemp.createTempSync();
+    Hive.init(tempDir.path);
+  });
+
+  setUp(() async {
+    if (!Hive.isBoxOpen('home_cache')) {
+      await Hive.openBox<Map>('home_cache');
+    }
+  });
+
+  tearDown(() async {
+    if (Hive.isBoxOpen('home_cache')) {
+      await Hive.box<Map>('home_cache').clear();
+    }
+  });
+
+  group('Home Clean Architecture Offline-First Caching Tests', () {
+    test('Remote Data Source returns valid JSON response models', () async {
+      final dataSource = HomeRemoteDataSourceImpl();
       final model = await dataSource.getHomeData();
 
       expect(model.promoBanners, isNotEmpty);
@@ -22,29 +58,75 @@ void main() {
       expect(model.popularItems, isNotEmpty);
       expect(model.orderAgainItems, isNotEmpty);
       expect(model.nearbyShops, isNotEmpty);
-
-      expect(
-        model.promoBanners.first.imageUrl,
-        equals(
-            'https://images.pexels.com/photos/23203429/pexels-photo-23203429.jpeg'),
-      );
     });
 
-    test('Repository and Use Case return mapped domain entities', () async {
-      final dataSource = HomeLocalDataSourceImpl();
-      final repository = HomeRepositoryImpl(localDataSource: dataSource);
-      final useCase = GetHomeDataUseCase(repository: repository);
+    test('Local Data Source caches and retrieves model correctly using Hive CE', () async {
+      final box = await Hive.openBox<Map>('test_home_cache');
+      final localDataSource = HomeLocalDataSourceImpl(cacheBox: box);
 
-      final entity = await useCase.execute();
+      final remoteSource = HomeRemoteDataSourceImpl();
+      final model = await remoteSource.getHomeData();
 
-      expect(entity.promoBanners.length, equals(2));
-      expect(entity.seasonalSpecials.length, equals(3));
-      expect(entity.popularItems.length, equals(3));
-      expect(entity.orderAgainItems.length, equals(3));
-      expect(entity.nearbyShops.length, equals(3));
+      await localDataSource.cacheHomeData(model);
+      final cached = await localDataSource.getCachedHomeData();
 
-      expect(entity.promoBanners.first.title, contains('Central Boulevard'));
-      expect(entity.seasonalSpecials.first.title, contains('Mistletoe'));
+      expect(cached, isNotNull);
+      expect(cached!.promoBanners.length, equals(model.promoBanners.length));
+      expect(cached.seasonalSpecials.first.title, equals(model.seasonalSpecials.first.title));
+
+      await box.clear();
+      await box.close();
+    });
+
+    test('Repository fetches from remote, caches data, and returns domain entities', () async {
+      final box = await Hive.openBox<Map>('test_home_cache_repo');
+      final localDataSource = HomeLocalDataSourceImpl(cacheBox: box);
+      final remoteDataSource = HomeRemoteDataSourceImpl();
+
+      final repository = HomeRepositoryImpl(
+        remoteDataSource: remoteDataSource,
+        localDataSource: localDataSource,
+      );
+
+      final entity = await repository.getHomeData();
+      expect(entity.promoBanners, isNotEmpty);
+
+      // Verify cached
+      final cached = await localDataSource.getCachedHomeData();
+      expect(cached, isNotNull);
+
+      await box.clear();
+      await box.close();
+    });
+
+    test('Repository falls back to local cache when remote fails (Offline-First mode)', () async {
+      final box = await Hive.openBox<Map>('test_home_cache_fallback');
+      final localDataSource = HomeLocalDataSourceImpl(cacheBox: box);
+
+      final remoteSource = HomeRemoteDataSourceImpl();
+      final validModel = await remoteSource.getHomeData();
+
+      // Pre-cache data
+      await localDataSource.cacheHomeData(validModel);
+
+      // Setup failing remote source
+      final failingRemote = MockRemoteDataSource(
+        modelToReturn: validModel,
+        shouldThrow: true,
+      );
+
+      final repository = HomeRepositoryImpl(
+        remoteDataSource: failingRemote,
+        localDataSource: localDataSource,
+      );
+
+      // Should succeed using local cache fallback
+      final entity = await repository.getHomeData();
+      expect(entity.promoBanners, isNotEmpty);
+      expect(entity.seasonalSpecials.first.title, equals(validModel.seasonalSpecials.first.title));
+
+      await box.clear();
+      await box.close();
     });
   });
 
